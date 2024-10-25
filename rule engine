@@ -1,0 +1,99 @@
+class Node:
+    """Represents a node in the Abstract Syntax Tree (AST)."""
+    
+    def __init__(self, node_type, value=None, left=None, right=None):
+        self.type = node_type  # "operator" for AND/OR, "operand" for conditions
+        self.value = value      # Optional value for operand nodes (e.g., number for comparisons)
+        self.left = left        # Reference to left child
+        self.right = right      # Reference to right child
+
+    def __repr__(self):
+        return f"Node(type={self.type}, value={self.value})"
+
+
+def create_rule(rule_string):
+    """Creates an AST from a rule string."""
+    tokens = rule_string.replace('(', ' ( ').replace(')', ' ) ').split()
+    return parse_expression(tokens)
+
+
+def parse_expression(tokens):
+    """Parses tokens and constructs the AST."""
+    if not tokens:
+        raise ValueError("Empty expression")
+
+    token = tokens.pop(0)
+
+    if token == '(':
+        left = parse_expression(tokens)
+        operator = tokens.pop(0)  # AND/OR
+        right = parse_expression(tokens)
+        tokens.pop(0)  # Remove the closing parenthesis
+        return Node("operator", operator, left, right)
+    elif token.isidentifier() or token.isnumeric():  # If token is an identifier (e.g., age, department)
+        operator = tokens.pop(0)  # Comparison operator (e.g., >, <, =)
+        value = tokens.pop(0)      # Value (e.g., 30, 'Sales')
+        return Node("operand", (token, operator, value))
+    
+    raise ValueError("Invalid token")
+
+
+def combine_rules(rules):
+    """Combines multiple rules into a single AST."""
+    if not rules:
+        return None
+    combined = create_rule(rules[0])
+    for rule in rules[1:]:
+        combined = Node("operator", "AND", combined, create_rule(rule))
+    return combined
+
+
+def evaluate_rule(node, data):
+    """Evaluates the AST against the provided data."""
+    if node.type == "operand":
+        var, operator, value = node.value
+        if isinstance(value, str):
+            value = value.strip("'")  # Remove quotes from strings
+        if operator == '>':
+            return data[var] > int(value)
+        elif operator == '<':
+            return data[var] < int(value)
+        elif operator == '=':
+            return data[var] == value
+    elif node.type == "operator":
+        left_result = evaluate_rule(node.left, data)
+        right_result = evaluate_rule(node.right, data)
+        if node.value == "AND":
+            return left_result and right_result
+        elif node.value == "OR":
+            return left_result or right_result
+
+    return False
+
+
+def test_rule_engine():
+    # Sample rules
+    rule1 = "((age > 30 AND department = 'Sales') OR (age < 25 AND department = 'Marketing')) AND (salary > 50000 OR experience > 5)"
+    rule2 = "((age > 30 AND department = 'Marketing')) AND (salary > 20000 OR experience > 5)"
+
+    # Creating AST for rules
+    ast1 = create_rule(rule1)
+    ast2 = create_rule(rule2)
+
+    # Combining rules into a single AST
+    combined_ast = combine_rules([rule1, rule2])
+
+    # Test data
+    user_data1 = {"age": 35, "department": "Sales", "salary": 60000, "experience": 6}
+    user_data2 = {"age": 22, "department": "Marketing", "salary": 18000, "experience": 3}
+
+    # Evaluating rules against data
+    print("AST for Rule 1:", ast1)
+    print("AST for Rule 2:", ast2)
+    print("Combined AST:", combined_ast)
+    print("Evaluation for user_data1:", evaluate_rule(combined_ast, user_data1))
+    print("Evaluation for user_data2:", evaluate_rule(combined_ast, user_data2))
+
+
+if __name__ == "__main__":
+    test_rule_engine()
